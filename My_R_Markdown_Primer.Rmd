@@ -1,0 +1,118 @@
+---
+title: "My R Markdown Primer"
+author: "Adriel"
+date: "November 10, 2026"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    highlight: tango
+    math_method: mathml
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE,
+                      fig.width = 7, fig.height = 4.5, fig.align = "center")
+```
+
+# Introduction
+
+**R Markdown** is a file format (`.Rmd`) that combines three things in one document:
+
+1. **Narrative text** written in Markdown,
+2. **Executable R code** placed in *chunks*, and
+3. **Output** (tables, numbers, and plots) produced by that code.
+
+When the file is *knit*, `knitr` runs every code chunk and drops the results into a Markdown file, and then **Pandoc** converts that file into HTML, PDF, or Word. Because the numbers and figures are produced from code each time the document is knit, the report can't drift out of sync with the analysis. That is the core idea behind **reproducible research**.
+
+# Markdown Basics
+
+Markdown uses plain-text symbols for formatting:
+
+| Syntax | Result |
+|:-------|:-------|
+| `**bold**` | **bold** |
+| `*italic*` | *italic* |
+| `` `code` `` | `code` |
+| `# Header` | a level-1 header |
+| `[link](https://rmarkdown.rstudio.com)` | [link](https://rmarkdown.rstudio.com) |
+
+> Block quotes start with `>`, and lists start with `-`, `*`, or `1.`
+
+# LaTeX Math
+
+Math is written with LaTeX inside dollar signs. An **inline** expression sits inside a sentence, like $\alpha + \beta = \gamma$, or the sample mean $\bar{x} = \frac{1}{n}\sum_{i=1}^{n} x_i$.
+
+A **displayed** equation uses double dollar signs and gets its own centered line. Here is the simple linear regression model used in the analysis below:
+
+$$
+\text{mpg}_i = \beta_0 + \beta_1 \cdot \text{wt}_i + \varepsilon_i, \qquad \varepsilon_i \sim N(0, \sigma^2)
+$$
+
+And the sample standard deviation:
+
+$$
+s = \sqrt{\frac{1}{n-1}\sum_{i=1}^{n}\left(x_i - \bar{x}\right)^2}
+$$
+
+# Analysis with R Code Chunks
+
+## Chunk 1: Load a library and dataset
+
+This chunk loads `ggplot2` and the built-in `mtcars` dataset (fuel economy and design data for 32 cars from the 1974 *Motor Trend* magazine).
+
+```{r load-data}
+library(ggplot2)
+
+data(mtcars)
+mtcars$cyl <- factor(mtcars$cyl)   # treat cylinders as a category
+
+head(mtcars[, c("mpg", "cyl", "hp", "wt")])
+```
+
+## Chunk 2: Summary statistics
+
+```{r summary-stats}
+summary(mtcars[, c("mpg", "hp", "wt")])
+
+# Average MPG by number of cylinders
+aggregate(mpg ~ cyl, data = mtcars, FUN = function(x) round(mean(x), 1))
+```
+
+Inline R code can also drop results straight into a sentence. The dataset has **`r nrow(mtcars)` cars** with an average fuel economy of **`r round(mean(mtcars$mpg), 1)` mpg** and a standard deviation of **`r round(sd(mtcars$mpg), 1)` mpg**. Those numbers are not typed in by hand. They are calculated when the document is knit.
+
+## Chunk 3: Fit the regression model
+
+```{r regression}
+model <- lm(mpg ~ wt, data = mtcars)
+coef(summary(model))
+```
+
+The fitted model is $\widehat{\text{mpg}} = `r round(coef(model)[1], 2)` `r round(coef(model)[2], 2)` \cdot \text{wt}$, with $R^2 = `r round(summary(model)$r.squared, 3)`$. Every extra 1,000 lbs of weight is associated with about **`r abs(round(coef(model)[2], 1))` fewer miles per gallon**.
+
+## Chunk 4: Visualize with ggplot2
+
+```{r mpg-plot, fig.cap="Heavier cars get worse gas mileage, and 8-cylinder cars cluster at the heavy, low-MPG end."}
+ggplot(mtcars, aes(x = wt, y = mpg)) +
+  geom_smooth(method = "lm", se = TRUE, color = "gray40", fill = "gray85") +
+  geom_point(aes(color = cyl), size = 3) +
+  scale_color_manual(values = c("4" = "#1b9e77", "6" = "#d95f02", "8" = "#7570b3")) +
+  labs(title = "Fuel Economy vs. Vehicle Weight",
+       x = "Weight (1,000 lbs)", y = "Miles per Gallon",
+       color = "Cylinders") +
+  theme_minimal(base_size = 13)
+```
+
+# Reflection
+
+Writing in R Markdown felt different from writing a plain report. Normally I'd run the analysis in a script, copy the numbers into a Word doc, and paste in screenshots of plots. If the data changed, every number had to be updated by hand. With R Markdown, the code *is* the source of the numbers, so knitting again updates everything at once. The inline R code (`` `r` ``) was the most useful part. The mean MPG and regression coefficients in the text above come straight from the model.
+
+A few things I noticed while knitting:
+
+- **Blank lines matter.** A list or table needs an empty line before it, or Markdown treats it as part of the paragraph above.
+- **Chunk options control what the reader sees.** `include=FALSE` hides the setup chunk entirely, while `message=FALSE` and `warning=FALSE` keep package loading messages out of the output.
+- **LaTeX works without a LaTeX install for HTML.** By default the equations are drawn by MathJax, which loads from the internet. Setting `math_method: mathml` in the YAML header makes the equations render even offline. Only PDF output needs a full TeX distribution.
+- **Chunk labels help with debugging.** When a knit fails, the error message names the chunk, which makes it much faster to find.
+
+Overall, R Markdown makes the workflow cleaner and more reproducible. Anyone with the `.Rmd` file and the data can knit the same report and get the same results.
